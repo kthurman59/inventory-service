@@ -4,7 +4,10 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-public class StockAdjustmentRequestDto {
+public class ReserveStockRequest {
+
+    @NotNull
+    private Long orderId;
 
     @NotBlank
     private String sku;
@@ -14,7 +17,15 @@ public class StockAdjustmentRequestDto {
 
     @NotNull
     @Min(1)
-    private Integer quantityDelta;
+    private Integer quantity;
+
+    public Long getOrderId() {
+        return orderId;
+    }
+
+    public void setOrderId(Long orderId) {
+        this.orderId = orderId;
+    }
 
     public String getSku() {
         return sku;
@@ -32,12 +43,12 @@ public class StockAdjustmentRequestDto {
         this.locationId = locationId;
     }
 
-    public Integer getQuantityDelta() {
-        return quantityDelta;
+    public Integer getQuantity() {
+        return quantity;
     }
 
-    public void setQuantityDelta(Integer quantityDelta) {
-        this.quantityDelta = quantityDelta;
+    public void setQuantity(Integer quantity) {
+        this.quantity = quantity;
     }
 }
 

@@ -1,110 +1,102 @@
 package com.kevdev.inventory.service.impl;
 
+import com.kevdev.inventory.dto.InventoryItemResponse;
 import com.kevdev.inventory.dto.StockAdjustmentRequestDto;
-import com.kevdev.inventory.dto.StockResponseDto;
+import com.kevdev.inventory.dto.ReserveStockRequest;
 import com.kevdev.inventory.entity.InventoryItem;
-import com.kevdev.inventory.entity.StockAdjustment;
 import com.kevdev.inventory.repository.InventoryItemRepository;
-import com.kevdev.inventory.repository.StockAdjustmentRepository;
 import com.kevdev.inventory.service.InventoryService;
-import lombok.RequiredArgsConstructor;
+import jakarta.persistence.EntityNotFoundException;
+import jakarta.validation.constraints.NotBlank;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
-
 @Service
-@RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class InventoryServiceImpl implements InventoryService {
 
-    private static final String DEFAULT_LOCATION_ID = "MAIN";
-
     private final InventoryItemRepository inventoryItemRepository;
-    private final StockAdjustmentRepository stockAdjustmentRepository;
+
+    public InventoryServiceImpl(InventoryItemRepository inventoryItemRepository) {
+        this.inventoryItemRepository = inventoryItemRepository;
+    }
 
     @Override
-    public StockResponseDto getStock(String sku, String locationId) {
-        String resolvedLocationId = resolveLocationId(locationId);
-        InventoryItem item = inventoryItemRepository.findBySkuAndLocationId(sku, resolvedLocationId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Inventory item not found for sku " + sku + " at location " + resolvedLocationId
-                ));
-        return mapToStockResponse(item);
+    @Transactional(readOnly = true)
+    public InventoryItemResponse getInventory(@NotBlank String sku, @NotBlank String locationId) {
+        InventoryItem item = inventoryItemRepository.findBySkuAndLocationId(sku, locationId)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Inventory not found for sku " + sku + " and location " + locationId));
+
+        return toResponse(item);
     }
 
     @Override
     @Transactional
-    public StockResponseDto adjustStock(StockAdjustmentRequestDto request) {
-        String resolvedLocationId = resolveLocationId(request.locationId());
+    public InventoryItemResponse adjustStock(StockAdjustmentRequestDto request) {
+        InventoryItem item = inventoryItemRepository.findBySkuAndLocationId(
+                        request.getSku(), request.getLocationId())
+                .orElseGet(() -> new InventoryItem(
+                        request.getSku(),
+                        request.getLocationId(),
+                        0,
+                        0
+                ));
 
-        if (request.quantityDelta() == null || request.quantityDelta() == 0L) {
-            throw new IllegalArgumentException("quantityDelta must not be null or zero");
-        }
-
-        Instant now = Instant.now();
-
-        InventoryItem item = inventoryItemRepository
-                .findBySkuAndLocationId(request.sku(), resolvedLocationId)
-                .orElseGet(() -> InventoryItem.builder()
-                        .sku(request.sku())
-                        .locationId(resolvedLocationId)
-                        .onHandQuantity(0L)
-                        .reservedQuantity(0L)
-                        .safetyStock(null)
-                        .reorderPoint(null)
-                        .version(0L)
-                        .createdAt(now)
-                        .updatedAt(now)
-                        .build());
-
-        long newOnHand = item.getOnHandQuantity() + request.quantityDelta();
+        int newOnHand = item.getQuantityOnHand() + request.getQuantityDelta();
         if (newOnHand < 0) {
-            throw new IllegalArgumentException("On hand quantity cannot be negative");
-        }
-        if (newOnHand < item.getReservedQuantity()) {
-            throw new IllegalArgumentException("Adjustment would reduce on hand below reserved quantity");
+            throw new IllegalArgumentException("Resulting quantity on hand would be negative");
         }
 
-        item.setOnHandQuantity(newOnHand);
-        if (item.getId() == null) {
-            item.setCreatedAt(now);
-        }
-        item.setUpdatedAt(now);
-        InventoryItem savedItem = inventoryItemRepository.save(item);
+        item.setQuantityOnHand(newOnHand);
+        InventoryItem saved = inventoryItemRepository.save(item);
 
-        StockAdjustment adjustment = StockAdjustment.builder()
-                .inventoryItem(savedItem)
-                .sku(savedItem.getSku())
-                .locationId(savedItem.getLocationId())
-                .quantityDelta(request.quantityDelta())
-                .reason(request.reason())
-                .createdAt(now)
-                .createdBy(null)
-                .build();
-
-        stockAdjustmentRepository.save(adjustment);
-
-        return mapToStockResponse(savedItem);
+        return toResponse(saved);
     }
 
-    private String resolveLocationId(String locationId) {
-        if (locationId == null || locationId.isBlank()) {
-            return DEFAULT_LOCATION_ID;
+    @Override
+    @Transactional
+    public void reserveStock(ReserveStockRequest request) {
+        InventoryItem item = inventoryItemRepository.findBySkuAndLocationId(
+                        request.getSku(), request.getLocationId())
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Inventory not found for sku " + request.getSku() +
+                                " and location " + request.getLocationId()));
+
+        int available = item.getAvailableQuantity();
+        if (available < request.getQuantity()) {
+            throw new IllegalArgumentException("Not enough stock available for sku " +
+                    request.getSku() + " at location " + request.getLocationId());
         }
-        return locationId;
+
+        item.setQuantityReserved(item.getQuantityReserved() + request.getQuantity());
+        inventoryItemRepository.save(item);
     }
 
-    private StockResponseDto mapToStockResponse(InventoryItem item) {
-        long available = item.getOnHandQuantity() - item.getReservedQuantity();
-        return new StockResponseDto(
+    @Override
+    @Transactional
+    public void releaseReserved(ReserveStockRequest request) {
+        InventoryItem item = inventoryItemRepository.findBySkuAndLocationId(
+                        request.getSku(), request.getLocationId())
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Inventory not found for sku " + request.getSku() +
+                                " and location " + request.getLocationId()));
+
+        int newReserved = item.getQuantityReserved() - request.getQuantity();
+        if (newReserved < 0) {
+            throw new IllegalArgumentException("Cannot release more reserved than currently reserved");
+        }
+
+        item.setQuantityReserved(newReserved);
+        inventoryItemRepository.save(item);
+    }
+
+    private InventoryItemResponse toResponse(InventoryItem item) {
+        return new InventoryItemResponse(
                 item.getSku(),
                 item.getLocationId(),
-                item.getOnHandQuantity(),
-                item.getReservedQuantity(),
-                available,
-                item.getSafetyStock(),
-                item.getReorderPoint()
+                item.getQuantityOnHand(),
+                item.getQuantityReserved(),
+                item.getAvailableQuantity()
         );
     }
 }

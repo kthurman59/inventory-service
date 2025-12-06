@@ -1,0 +1,2 @@
+ALTER TABLE stock_adjustment
+    ADD COLUMN sku VARCHAR(100) NOT NULL;

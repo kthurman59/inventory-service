@@ -1,13 +1,11 @@
-cat > src/main/resources/application.yml << 'EOF'
 spring:
   application:
     name: inventory-service
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/inventorydb
-    username: inventory
-    password: inventory
-    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/inventory
+    username: oms_user
+    password: oms_password
 
   jpa:
     hibernate:
@@ -15,32 +13,18 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        jdbc:
-          time_zone: UTC
-    open-in-view: false
+        show_sql: false
 
   flyway:
     enabled: true
     locations: classpath:db/migration
-    baseline-on-migrate: true
-
-  kafka:
-    bootstrap-servers: localhost:9092
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
-
-server:
-  port: 8081
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
-  endpoint:
-    health:
-      probes:
-        enabled: true
-EOF
+        include: health,info
+
+server:
+  port: 8081
 

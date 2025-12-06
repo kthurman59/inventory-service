@@ -1,0 +1,2 @@
+ALTER TABLE reservation_line
+    ADD COLUMN sku VARCHAR(100) NOT NULL;

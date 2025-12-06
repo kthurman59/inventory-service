@@ -1,0 +1,3 @@
+ALTER TABLE reservation
+    ADD COLUMN reason VARCHAR(255) NOT NULL;
+

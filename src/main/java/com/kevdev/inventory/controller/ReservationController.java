@@ -7,15 +7,10 @@ import com.kevdev.inventory.service.ReservationService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/inventory")
+@RequestMapping("/api/inventory/reservations")
 public class ReservationController {
 
     private final ReservationService reservationService;
@@ -24,7 +19,8 @@ public class ReservationController {
         this.reservationService = reservationService;
     }
 
-    @PostMapping("/reservations")
+    // POST  /api/inventory/reservations
+    @PostMapping
     public ResponseEntity<ReservationResponseDto> createReservation(
             @Valid @RequestBody ReservationCreateRequestDto request
     ) {
@@ -32,7 +28,8 @@ public class ReservationController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PostMapping("/reservations/{reservationId}/commit")
+    // POST  /api/inventory/reservations/{reservationId}/commit
+    @PostMapping("/{reservationId}/commit")
     public ReservationResponseDto commitReservation(
             @PathVariable("reservationId") Long reservationId,
             @RequestBody ReservationActionRequestDto request
@@ -40,7 +37,8 @@ public class ReservationController {
         return reservationService.commitReservation(reservationId, request.reason());
     }
 
-    @PostMapping("/reservations/{reservationId}/release")
+    // POST  /api/inventory/reservations/{reservationId}/release
+    @PostMapping("/{reservationId}/release")
     public ReservationResponseDto releaseReservation(
             @PathVariable("reservationId") Long reservationId,
             @RequestBody ReservationActionRequestDto request
@@ -48,7 +46,8 @@ public class ReservationController {
         return reservationService.releaseReservation(reservationId, request.reason());
     }
 
-    @GetMapping("/reservations/by-order/{orderId}")
+    // GET  /api/inventory/reservations/order/{orderId}
+    @GetMapping("/by-order/{orderId}")
     public ReservationResponseDto getReservationByOrderId(
             @PathVariable("orderId") String orderId
     ) {
