@@ -15,3 +15,10 @@ spring:
   flyway:
     enabled: false
 
+  kafka:
+    admin:
+      enabled: false
+
+inventory:
+  kafka:
+    enabled: false
