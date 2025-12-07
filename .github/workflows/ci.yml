@@ -2,20 +2,18 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
-
-permissions:
-  contents: read
-  packages: write
+    branches:
+      - main
 
 jobs:
   build_test_and_docker:
     runs-on: ubuntu-latest
-    env:
-      REGISTRY: ghcr.io
-      IMAGE_NAME: ${{ github.repository }}
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout code
@@ -46,27 +44,25 @@ jobs:
           path: |
             target/surefire-reports
             target/site/jacoco
+          if-no-files-found: ignore
 
       - name: Log in to GitHub Container Registry
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
-        if: github.event_name == 'push'
+      - name: Build Docker image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          IMAGE=$REGISTRY/$IMAGE_NAME
+          IMAGE=ghcr.io/${{ github.repository_owner }}/inventory-service:${{ github.sha }}
+          docker build -t "$IMAGE" .
 
-          echo "Building image $IMAGE:${GITHUB_SHA}"
-          docker build -t $IMAGE:${GITHUB_SHA} .
-
-          echo "Tagging image as $IMAGE:main"
-          docker tag $IMAGE:${GITHUB_SHA} $IMAGE:main
-
-          echo "Pushing images"
-          docker push $IMAGE:${GITHUB_SHA}
-          docker push $IMAGE:main
+      - name: Push Docker image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          IMAGE=ghcr.io/${{ github.repository_owner }}/inventory-service:${{ github.sha }}
+          docker push "$IMAGE"
 
