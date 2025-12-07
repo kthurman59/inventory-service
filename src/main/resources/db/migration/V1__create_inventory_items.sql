@@ -3,6 +3,6 @@ CREATE TABLE inventory_items (
     product_id BIGINT NOT NULL UNIQUE,
     quantity_on_hand INTEGER NOT NULL,
     quantity_reserved INTEGER NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL
+    updated_at TIMESTAMP WITH TIME ZONE
 );
 

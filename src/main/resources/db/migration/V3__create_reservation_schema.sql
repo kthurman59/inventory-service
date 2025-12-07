@@ -2,8 +2,8 @@ CREATE TABLE reservation (
     id BIGSERIAL PRIMARY KEY,
     reservation_number VARCHAR(64) NOT NULL UNIQUE,
     status VARCHAR(32) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
 CREATE TABLE reservation_line (
@@ -13,8 +13,8 @@ CREATE TABLE reservation_line (
     product_id BIGINT NOT NULL,
     reserved_quantity INTEGER NOT NULL,
     status VARCHAR(32) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
 CREATE TABLE stock_adjustment (
@@ -22,6 +22,6 @@ CREATE TABLE stock_adjustment (
     inventory_item_id BIGINT NOT NULL REFERENCES inventory_items(id),
     adjustment_quantity INTEGER NOT NULL,
     reason VARCHAR(255),
-    created_at TIMESTAMPTZ NOT NULL
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
