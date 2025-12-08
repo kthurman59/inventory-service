@@ -4,7 +4,6 @@ import java.util.List;
 
 public record OrderCreatedEvent(
         String orderId,
-        Long customerId,
         List<OrderItemEvent> items
-
-) {}
+) {
+}

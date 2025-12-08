@@ -1,19 +1,20 @@
 package com.kevdev.inventory.messaging.event;
 
+import java.util.List;
+
 public record InventoryReservationResultEvent(
         String orderId,
         String status,
-        String reason
+        List<LineResult> lines
 ) {
-    public static final String STATUS_RESERVED = "RESERVED";
-    public static final String STATUS_FAILED = "FAILED";
-
-    public static InventoryReservationResultEvent reserved(String orderId) {
-        return new InventoryReservationResultEvent(orderId, STATUS_RESERVED, null);
-    }
-
-    public static InventoryReservationResultEvent failed(String orderId, String reason) {
-        return new InventoryReservationResultEvent(orderId, STATUS_FAILED, reason);
+    public record LineResult(
+            String sku,
+            String locationId,
+            long requestedQuantity,
+            long reservedQuantity,
+            String status,
+            String failureReason
+    ) {
     }
 }
 

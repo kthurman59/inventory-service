@@ -12,6 +12,7 @@ spring:
       properties:
         spring.json.trusted.packages: com.kevdev.inventory.events
         spring.json.use.type.headers: false
+        spring.json.value.default.type: com.kevdev.inventory.messaging.event.OrderCreatedEvent
 
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer

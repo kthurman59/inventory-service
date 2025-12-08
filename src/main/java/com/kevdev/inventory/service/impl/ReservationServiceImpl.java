@@ -9,10 +9,14 @@ import com.kevdev.inventory.entity.Reservation;
 import com.kevdev.inventory.entity.ReservationLine;
 import com.kevdev.inventory.entity.ReservationLineStatus;
 import com.kevdev.inventory.entity.ReservationStatus;
+import com.kevdev.inventory.messaging.event.InventoryReservationResultEvent;
+import com.kevdev.inventory.messaging.event.OrderCreatedEvent;
 import com.kevdev.inventory.repository.InventoryItemRepository;
 import com.kevdev.inventory.repository.ReservationRepository;
 import com.kevdev.inventory.service.ReservationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +32,16 @@ public class ReservationServiceImpl implements ReservationService {
 
     private final ReservationRepository reservationRepository;
     private final InventoryItemRepository inventoryItemRepository;
+    private final ObjectProvider<KafkaTemplate<String, InventoryReservationResultEvent>> inventoryResultKafkaTemplateProvider;
+
+    @Override
+    @Transactional
+    public ReservationResponseDto reserveForOrder(OrderCreatedEvent event) {
+        ReservationCreateRequestDto request = mapFromOrderEvent(event);
+        ReservationResponseDto response = createReservation(request);
+        publishInventoryReservationResult(event, response);
+        return response;
+    }
 
     @Override
     @Transactional
@@ -227,6 +241,46 @@ public class ReservationServiceImpl implements ReservationService {
                 reservation.getReason(),
                 itemDtos
         );
+    }
+
+    private ReservationCreateRequestDto mapFromOrderEvent(OrderCreatedEvent event) {
+        List<ReservationItemRequestDto> items = event.items().stream()
+                .map(item -> new ReservationItemRequestDto(
+                        item.sku(),
+                        item.locationId(),
+                        item.quantity()
+                ))
+                .toList();
+
+        return new ReservationCreateRequestDto(event.orderId(), items);
+    }
+
+    private void publishInventoryReservationResult(
+            OrderCreatedEvent orderEvent,
+            ReservationResponseDto reservationResponse
+    ) {
+        KafkaTemplate<String, InventoryReservationResultEvent> template =
+                inventoryResultKafkaTemplateProvider.getIfAvailable();
+        if (template == null) {
+            return;
+        }
+
+        InventoryReservationResultEvent resultEvent = new InventoryReservationResultEvent(
+                orderEvent.orderId(),
+                reservationResponse.status(),
+                reservationResponse.items().stream()
+                        .map(item -> new InventoryReservationResultEvent.LineResult(
+                                item.sku(),
+                                item.locationId(),
+                                item.requestedQuantity(),
+                                item.reservedQuantity(),
+                                item.status(),
+                                item.failureReason()
+                        ))
+                        .toList()
+        );
+
+        template.send("inventory.reservation.results", orderEvent.orderId(), resultEvent);
     }
 }
 
