@@ -10,6 +10,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -53,8 +55,44 @@ public class Reservation {
     @Column(name = "expires_at")
     private Instant expiresAt;
 
-    @OneToMany(mappedBy = "reservation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(
+        mappedBy = "reservation",
+        cascade = CascadeType.ALL,
+        orphanRemoval = true,
+        fetch = FetchType.LAZY
+    )
     @Builder.Default
     private List<ReservationLine> lines = new ArrayList<>();
+
+    @PrePersist
+    void prePersist() {
+        Instant now = Instant.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
+        // Optional, only if you have this enum constant
+        // if (status == null) {
+        //     status = ReservationStatus.PENDING;
+        // }
+    }
+
+    @PreUpdate
+    void preUpdate() {
+        updatedAt = Instant.now();
+    }
+
+    public void addLine(ReservationLine line) {
+        lines.add(line);
+        line.setReservation(this);
+    }
+
+    public void removeLine(ReservationLine line) {
+        lines.remove(line);
+        line.setReservation(null);
+    }
 }
+
 
