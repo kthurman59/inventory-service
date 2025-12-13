@@ -22,3 +22,10 @@ spring:
 inventory:
   kafka:
     enabled: false
+
+logging:
+  level:
+    org.apache.kafka: WARN
+    kafka: WARN
+    org.springframework.kafka: WARN
+
