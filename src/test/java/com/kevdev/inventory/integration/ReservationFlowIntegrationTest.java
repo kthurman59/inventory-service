@@ -26,6 +26,8 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.annotation.DirtiesContext.ClassMode;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.time.Duration;
@@ -41,9 +43,17 @@ import static org.assertj.core.api.Assertions.assertThat;
         "inventory.kafka.enabled=true"
 })
 @ActiveProfiles("test")
+@DirtiesContext(classMode = ClassMode.AFTER_CLASS)
 @EmbeddedKafka(
-        partitions = 3,
-        topics = {"orders.created", "inventory.reservation.results"}
+        partitions = 1,
+        topics = { "orders.created", "inventory.reservation.results" },
+        controlledShutdown = true,
+        brokerProperties = {
+                "log.dirs=target/embedded-kafka-logs",
+                "offsets.topic.replication.factor=1",
+                "transaction.state.log.replication.factor=1",
+                "transaction.state.log.min.isr=1"
+        }
 )
 class ReservationFlowIntegrationTest {
 
@@ -62,18 +72,17 @@ class ReservationFlowIntegrationTest {
     @Autowired
     private InventoryItemRepository inventoryItemRepository;
 
+    private DefaultKafkaProducerFactory<String, OrderCreatedEvent> producerFactory;
     private KafkaTemplate<String, OrderCreatedEvent> orderCreatedTemplate;
 
     private Consumer<String, InventoryReservationResultEvent> resultConsumer;
 
     @BeforeEach
     void setUp() {
-        // Clean DB
         reservationLineRepository.deleteAll();
         reservationRepository.deleteAll();
         inventoryItemRepository.deleteAll();
 
-        // Seed inventory row that the reservation logic expects
         InventoryItem inventoryItem = new InventoryItem(
                 TEST_SKU,
                 TEST_LOCATION,
@@ -82,18 +91,14 @@ class ReservationFlowIntegrationTest {
         );
         inventoryItemRepository.saveAndFlush(inventoryItem);
 
-        // Producer for orders.created
         Map<String, Object> producerProps = KafkaTestUtils.producerProps(embeddedKafka);
-        DefaultKafkaProducerFactory<String, OrderCreatedEvent> pf =
-                new DefaultKafkaProducerFactory<>(
-                        producerProps,
-                        new StringSerializer(),
-                        new JsonSerializer<>()
-                );
+        producerFactory = new DefaultKafkaProducerFactory<>(
+                producerProps,
+                new StringSerializer(),
+                new JsonSerializer<>()
+        );
+        orderCreatedTemplate = new KafkaTemplate<>(producerFactory);
 
-        orderCreatedTemplate = new KafkaTemplate<>(pf);
-
-        // Consumer for inventory.reservation.results
         Map<String, Object> consumerProps =
                 KafkaTestUtils.consumerProps("reservation-flow-test", "false", embeddedKafka);
         consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
@@ -102,14 +107,14 @@ class ReservationFlowIntegrationTest {
                 new JsonDeserializer<>(InventoryReservationResultEvent.class, false);
         valueDeserializer.addTrustedPackages("com.kevdev.inventory.messaging.event");
 
-        DefaultKafkaConsumerFactory<String, InventoryReservationResultEvent> cf =
+        DefaultKafkaConsumerFactory<String, InventoryReservationResultEvent> consumerFactory =
                 new DefaultKafkaConsumerFactory<>(
                         consumerProps,
                         new StringDeserializer(),
                         valueDeserializer
                 );
 
-        resultConsumer = cf.createConsumer();
+        resultConsumer = consumerFactory.createConsumer();
         embeddedKafka.consumeFromEmbeddedTopics(resultConsumer, "inventory.reservation.results");
     }
 
@@ -117,6 +122,9 @@ class ReservationFlowIntegrationTest {
     void tearDown() {
         if (resultConsumer != null) {
             resultConsumer.close();
+        }
+        if (producerFactory != null) {
+            producerFactory.destroy();
         }
     }
 
@@ -126,11 +134,9 @@ class ReservationFlowIntegrationTest {
 
         OrderCreatedEvent orderEvent = buildOrderCreatedEvent(orderId);
 
-        // Send the order created event
         orderCreatedTemplate.send("orders.created", orderId, orderEvent);
         orderCreatedTemplate.flush();
 
-        // Read the reservation result event
         var record = KafkaTestUtils.getSingleRecord(
                 resultConsumer,
                 "inventory.reservation.results",
@@ -142,7 +148,6 @@ class ReservationFlowIntegrationTest {
         assertThat(resultEvent).isNotNull();
         assertThat(resultEvent.orderId()).isEqualTo(orderId);
 
-        // Verify reservation exists in the database
         Optional<Reservation> reservationOpt = reservationRepository.findByOrderId(orderId);
         assertThat(reservationOpt).isPresent();
 
@@ -175,4 +180,3 @@ class ReservationFlowIntegrationTest {
         );
     }
 }
-
