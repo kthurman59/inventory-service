@@ -37,11 +37,15 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(properties = {
-        "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
-        "spring.kafka.consumer.auto-offset-reset=earliest",
-        "inventory.kafka.enabled=true"
-})
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.NONE,
+        properties = {
+                "spring.kafka.bootstrap-servers=${spring.embedded.kafka.brokers}",
+                "spring.kafka.consumer.auto-offset-reset=earliest",
+                "inventory.kafka.enabled=true"
+        }
+)
+
 @ActiveProfiles("test")
 @DirtiesContext(classMode = ClassMode.AFTER_CLASS)
 @EmbeddedKafka(
