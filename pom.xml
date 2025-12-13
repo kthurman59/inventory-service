@@ -157,6 +157,13 @@
                             <goal>check</goal>
                         </goals>
                         <configuration>
+                              <excludes>
+                                <exclude>**/dto/**</exclude>
+                                <exclude>**/entity/**</exclude>
+                                <exclude>**/config/**</exclude>
+                                <exclude>**/messaging/event/**</exclude>
+                                <exclude>**/*Application*</exclude>
+                              </excludes>
                             <rules>
                                 <rule>
                                     <element>BUNDLE</element>
@@ -164,7 +171,7 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.40</minimum>
+                                            <minimum>0.60</minimum>
                                         </limit>
                                     </limits>
                                 </rule>
